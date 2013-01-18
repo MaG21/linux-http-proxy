@@ -15,3 +15,7 @@ the server.
 Please, don't hesitate to contact me, send a pull request, a comment or
 anything.
 
+License
+-------
+This content is released under the MIT License. For more information
+refer to file COPYRIGHT included in this distribution.
