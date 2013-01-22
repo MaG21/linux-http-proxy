@@ -17,11 +17,11 @@
 #define HTTP_SCHEME_LENGTH             0x06
 
 struct http_url {
-	char  *scheme;   /* either HTTP or HTTPS */
-	char  *host;
-	char  *path;
-	char  *port;
-	int   issecure;  /* TRUE or FALSE */
+	char      *scheme;   /* either HTTP or HTTPS */
+	char      *host;
+	char      *path;
+	char      *port;
+	uint8_t   issecure;  /* TRUE or FALSE */
 };
 
 struct http_request {

@@ -42,6 +42,7 @@ again:
 			     "Error: Optior -p has a null argument.\n");
 			exit(EXIT_FAILURE);
 		}
+		free(opts->port);
 		opts->port = strdup(optarg);
 		goto again;
 	case ':':

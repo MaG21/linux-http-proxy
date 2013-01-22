@@ -106,10 +106,32 @@ error:
 	return NULL;
 }
 
+static struct http_url
+http_parse_resource(char *resouce)
+{
+	char            *token;
+	char            *saveptr;
+	struct http_url *res;
+
+	token = strtok_r(resource, ":", &saveptr);
+	if(!token)
+		return NULL;
+
+	res       = calloc(1, sizeof(*res));
+	res->host = strdup(token);
+
+	token = strtok_r(NULL, "\0")
+	if(!token)
+		res->port = strdup(token);
+	else
+		res->port = strdup("80"); /* by default 80 */
+   return res;
+}
+
 struct http_request*
 http_parse_request(char *header)
 {
-	char                *tmp       = strdup(header);
+	char                *tmp = strdup(header);
 	char                *token;
 	char                *saveptr;
 	char                *saveptr2;
@@ -122,19 +144,20 @@ http_parse_request(char *header)
 		free(tmp);
 		return NULL
 	}
-	
+
 	req = malloc(sizeof(*req));
-	req->method = strdup(token);
+	if(!strcasecmp(req->method, "CONNECT")) {
+		req->method = strdup("GET");
+		req->url = http_parse_resource(token);
+	} else {
+		req->method = strdup(token);
+		req->url = http_parse_url(token);
+	}
 
 	token = strtok_r(NULL, " ", &saveptr2);
 	if(!token)
 		goto error;
 
-	if(!strcasecmp(req->method, "CONNECT")) {
-		req->url = http_parse_resource(token);
-	} else {
-		req->url = http_parse_url(token);
-	}
 	if(!req->url)
 		goto error;
 
@@ -164,20 +187,30 @@ http_parse_request(char *header)
 	return req;
 error:
 	free(tmp);
-	free_http_request(req);
+	http_free_request(req);
 	return NULL;
 }
 
+/*
+ * returns
+ * 	-1 or 1 on error. If -1 is returned errno is set appropriately.
+ * 	1 on success.
+ */
 int
-http_proxy(client, server, header, req)
-int client;
-int server;
-const char *header;
-struct http_request *req;
+http_proxy_make_request(int sock)
 {
-	int  ret;
-	char *buf;
+	int    ret;
+	char   *buf;
+	char   *header;
 	size_t len;
+
+	header = http_get_header(sock);
+	if(!header)
+		return -1;
+
+	req = http_parse_request(header);
+	if(!req)
+		return 1; /* errno is not set */
 
 	/* 2 white spaces + 1 CR + 1 LF */
 	len = strlen(req->method) + strlen(req->path) +strlen(req->protocol)+4;
@@ -188,37 +221,48 @@ struct http_request *req;
 	ret = net_send(server, &buf[0], len);
 	free(buf);
 	if(ret<0)
-		return -1;
+		goto error_end_func;
 
 	ret = net_send(server, header, strlen(header));
 	if(ret<0)
-		return -1;
+		goto error_end_func;
 
 	if(req->content_length!=-1) {
 		ret = net_exchange(server, client, req->content_length);
 		if(ret<0)
-			return -1;
+			error_end_func;
 	}
-struct http_url
-http_parse_resource(char *resouce)
+
+error_end_func:
+	http_free_request(req);
+	return ret;
+}
+
+
+void
+http_free_request(struct http_request *req)
 {
-	char            *token;
-	char            *saveptr;
-	struct http_url *res;
+	if(!req)
+		return;
+	if(req->method)
+		free(req->method);
+	if(req->protocol)
+		free(req->protocol);
 
-	token = strtok_r(resource, ":", &saveptr);
-	if(!token)
-		return NULL;
+	if(!req->url)
+		goto end_func;
 
-	res = calloc(1, sizeof(*res));
-	res->host = strdup(token);
+	if(req->url->scheme)
+		free(req->url->scheme);
+	if(req->url->host)
+		free(req->url->host);
+	if(req->url->path)
+		free(req->url->path);
+	if(req->url->port)
+		free(req->url->port);
 
-	token = strtok_r(NULL, "\0")
-	if(!token) {
-		res->port =  strdup(token);
-	} else {
-		res->port = strdup("80"); /* by default 80 */
-	}
-   return res;
+end_func:
+	free(req);
+	return;
 }
 

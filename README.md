@@ -1,21 +1,28 @@
-linux-http-proxy
-================
+# linux-http-proxy
 A fast, lightweight http/https proxy server for GNU/Linux.
 
-Goal
-----
-The main goal is to leave aside portability issues and provide a small, clean
-yet fast HTTP/HTTPS proxy server that make the most out of your GNU/Linux box.
+### Goals
+	1. Performance.
+	2. Security.
+	3. lightweight.
+	4. Clean Code.
 
-NOTE
----
+### Lacks
+	1. Portability. (GNU/Linux only)
+	2. Debugging capabilities.
+	3. Completeness. (Basic features only)
+
+The main goal is to leave aside portability issues and provide a small, clean
+yet fast HTTP/HTTPS proxy server that makes the most out of your GNU/Linux box.
+Also, IPv6 will be suppported.
+
+## NOTE
 This server is not done yet, I'll be working on it till I finish completly
 the server.
 
 Please, don't hesitate to contact me, send a pull request, a comment or
 anything.
 
-License
--------
+## License
 This content is released under the MIT License. For more information
 refer to file COPYRIGHT included in this distribution.

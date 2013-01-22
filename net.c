@@ -1,6 +1,94 @@
 #include "net.h"
 
 /*
+ *
+ * NOTE:
+ *   The compiler (GCC), is smart enough to realise this function should
+ *   be inlined. (See: Linux Kernel Condig Style, chapter 15)
+ */
+static void
+net_sys_err(const char *s)
+{
+	perror(s);
+	exit(EXIT_FAILURE);
+}
+
+/*
+ *
+ * NOTE:
+ *   The compiler (GCC), is smart enough to realise this function should
+ *   be inlined. (See: Linux Kernel Condig Style, chapter 15)
+ */
+static _Bool
+net_check_errno_EAGAIN(void)
+{
+	return ((errno==EAGAIN) || (errno==EWOULDBLOCK));
+}
+
+/*
+ */
+void
+net_accept_connections(int epollfd, int sock)
+{
+	int                sock;
+	int                ret;
+	struct net_proxy   *conn_info;
+	struct epoll_event ev;
+
+	while(1) {
+		ret = accept(sock, NULL, NULL);
+		if(ret < 0 && net_check_errno_EAGAIN())
+			break;
+
+		if(ret<0)
+			continue;
+
+		net_set_nonblock(ret);
+		conn_info = malloc(sizeof(*conn_info));
+
+		conn_info->client = ret;
+		conn_info->server = NET_SOCKET_CLOSED;
+		ev.events         = EPOLLET | EPOLLIN;
+		ev.data.ptr       = conn_info;
+
+		ret = epoll_ctrl(epollfd, EPOLL_CTL_ADD, ret, &ev);
+		if(!ret)
+			continue;
+
+		if(errno==ENOSPC) { /* epoll can't watch more users */
+			close(conn_info->client);
+			free(conn_info);
+			perror("epoll");
+			return;
+		}
+		net_sys_err("epoll");
+	}
+	return;
+}
+
+void
+net_check_sockets(struct epoll_event *evs, size_t n_events)
+{
+	int   i;
+
+	for(i=0; i < n ; i++ ) {
+		if((evs[i].events & EPOLLERR) || (evs[i].events & EPOLLHUP) ||
+		                                 (!(evs[i].events & EPOLLIN)) ) {
+			if(evs[i].data.ptr->dataptr)
+				free(evs[i].data.ptr->dataptr);
+
+			close(evs[i].data.ptr->client);
+
+			if(evs[i].data.ptr->server != NET_SOCKET_CLOSED)
+				close(evs[i].data.ptr->server);
+
+			free(evs[i].data.ptr);
+			evs[i].data.ptr = NULL;
+		}
+	}
+}
+
+/*
  * service:  this argument can be either a protocol name or a port number.
  *
  * returns:
@@ -54,68 +142,6 @@ net_listen(char *service)
 	if(ret<0)
 		net_sys_err("listen");
    return sock;
-}
-
-/*
- */
-void
-net_accept_connections(int sock, int epollfd)
-{
-	int                sock;
-	int                ret;
-	struct net_proxy   *conn_info;
-	struct epoll_event ev;
-
-	while(1) {
-		len = sizeof(addr);
-		ret = accept(sock, NULL, NULL);
-		if(ret < 0 && ((errno==EWOULDBLOCK) || (errno==EAGAIN)) )
-			break;
-
-		if(ret<0)
-			continue;
-
-		net_set_nonblock(ret);
-		conn_info = malloc(sizeof(*conn_info));
-
-		conn_info->client = ret;
-		conn_info->server = NET_SOCKET_CLOSED;
-		ev.events         = EPOLLET | EPOLLIN;
-		ev.data.ptr       = conn_info;
-
-		ret = epoll_ctrl(epollfd, EPOLL_CTL_ADD, ret, &ev);
-		if(!ret)
-			continue;
-
-		if(errno==ENOSPC) { /* epoll can't watch more users */
-			close(conn_info->client);
-			free(conn_info);
-		}
-		net_sys_err("epoll");
-	}
-	return;
-}
-
-void
-net_check_sockets(struct epoll_event *evs, size_t n_events)
-{
-	int   i;
-
-	for(i=0; i < n ; i++ ) {
-		if((evs[i].events & EPOLLERR) || (evs[i].events & EPOLLHUP) ||
-		                                 (!(evs[i].events & EPOLLIN)) ) {
-			if(evs[i].data.ptr->dataptr)
-				free(evs[i].data.ptr->dataptr);
-
-			close(evs[i].data.ptr->client);
-
-			if(evs[i].data.ptr->server != NET_SOCKET_CLOSED)
-				close(evs[i].data.ptr->server);
-
-			free(evs[i].data.ptr);
-			evs[i].data.ptr = NULL;
-		}
-	}
 }
 
 /*
@@ -202,13 +228,12 @@ net_splice(int in, int out, size_t data_len)
 		SPLICE_F_MOVE | SPLICE_F_NONBLOCK);
 
 		if(len <= 0) {
-			if(len<0 && (errno==EAGAIN || errno==EWOULDBLOCK)) {
+			if(len<0 && net_check_errno_EAGAIN())
 				return nbytes;
-			} else if(!len) {
+			else if(!len)
 				return nbytes;
-			} else {
+			else 
 				return -1;
-			}
 		}
 		data_len -= len;
 		nbytes   += len;
@@ -227,16 +252,14 @@ net_exchange(int sock_in, int sock_out, size_t nbytes)
 	int      pipefd[2];
 
 	pipe(pipefd);
-	if(ret<0) {
-		perror("pipe()");
-		exit(EXIT_FAILURE);  /* pipes are a very important resource */
-	}
+	if(ret<0)
+		net_sys_err("pipe()");
 
-	ret = splice_all(sock_in, NULL, pipefd[0], NULL, nbytes);
+	ret = net_splice(sock_in, NULL, pipefd[0], NULL, nbytes);
 	if(ret<0)
 		return -1;
 
-	ret = splice_all(pipefd[0], NULL, sock_out, NULL, ret);
+	ret = net_splice(pipefd[0], NULL, sock_out, NULL, ret);
 	if(ret<0)
 		return -1;
 
@@ -245,9 +268,3 @@ net_exchange(int sock_in, int sock_out, size_t nbytes)
    return ret;
 }
 
-static void
-net_sys_err(const char *s)
-{
-	perror(s);
-	exit(EXIT_FAILURE);
-}

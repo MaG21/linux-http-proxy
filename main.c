@@ -7,13 +7,13 @@
 int
 main(int argc, char **argv)
 {
-	int                   i;
-	int                   n
-	int                   ret;
-	int                   sock;
-	int                   epollfd;
-	struct epoll_event    *events;
-	struct  utils_options *opts;	
+	int                  i;
+	int                  n
+	int                  ret;
+	int                  sock;
+	int                  epollfd;
+	struct epoll_event   *events;
+	struct utils_options *opts;	
 
 	opts = utils_getopt(argc, argv);
 
@@ -43,7 +43,7 @@ main(int argc, char **argv)
 				continue;
 
 			if(events[i].data.ptr->client==sock) {
-				net_accept_connections(sock, epollfd);
+				net_accept_connections(epollfd, sock);
 				continue;
 			}
 
