@@ -2,8 +2,8 @@
 A fast, lightweight http/https proxy server for GNU/Linux.
 
 ### Goals
-	1. Performance.
-	2. Security.
+	1. Security.
+	2. Performance.
 	3. lightweight.
 	4. Clean Code.
 
