@@ -1,3 +1,50 @@
 Please follow the Linux Kernel Coding Style as much as possible.
 
 http://www.kernel.org/doc/Documentation/CodingStyle
+
+* Please note the following points:
+
+1. Do not place spaces after these keywords:
+	if, switch, case, for, while
+
+2. When defining a function, the returned data type must be in one line and the
+function name along with the arguments in another line.
+
+/* bad */
+int function(void)
+{
+	/* code */
+}
+
+/* good */
+
+int
+function(void)
+{
+	/* code */
+}
+
+In this way, things gets more organized. When searching, is easier to discard
+things, also in this way you got more room to use in the argument list of a
+function that has many arguments or the freedom to choose better names for
+the arguments.
+
+3. When declaring variables, declare them in order, for example:
+
+/* bad */
+size_t length;
+int b;
+char c;
+char *ptr;
+int i;
+size_t size;
+
+
+/* good */
+int    b;
+int    i;
+char   c;
+char   *ptr;
+size_t length;
+size_t size;
+
