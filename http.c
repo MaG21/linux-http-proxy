@@ -171,12 +171,12 @@ http_parse_request(char *header)
 		if(strcasecmp(token, "content-length"))
 			continue;
 
-		token = strtok_r(token, ": ", &saveptr2);
+		token = strtok_r(NULL, "\0", &saveptr2);
 		if(!token)
 			goto error;
 
 		n = utils_parse_number(token);
-		if(!errno)
+		if(!errno || n<0)
 			goto error;
 
 		req->content_length = n;

@@ -248,7 +248,7 @@ net_splice(int in, int out, size_t data_len)
  *	transferred.
  */
 int
-net_exchange(const struct net_proxy *proxy)
+net_exchange(int sock_in, int sock_out, size_t nbytes)
 {
 	int      ret;
 	int      pipefd[2];
