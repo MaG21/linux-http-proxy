@@ -14,9 +14,13 @@
 #define NET_SOCKET_CLOSED -1
 
 struct net_proxy {
-	size_t  data_len;
-	int     client;
-	int     server;
-	char    *dataptr;
-}
+	struct {
+		size_t remaining;
+		int    fd;
+	} peer;
+
+	size_t remaining;
+	int    fd;
+};
+
 #endif

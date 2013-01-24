@@ -1,3 +1,6 @@
+/*
+ * FIXME: Identation levels too deep.
+ */
 #include "http.h"
 #include "net.h"
 #include "utils.h"
@@ -12,8 +15,9 @@ main(int argc, char **argv)
 	int                  ret;
 	int                  sock;
 	int                  epollfd;
+	struct net_proxy     *proxy;
 	struct epoll_event   *events;
-	struct utils_options *opts;	
+	struct utils_options *opts;
 
 	opts = utils_getopt(argc, argv);
 
@@ -48,5 +52,38 @@ main(int argc, char **argv)
 			}
 
 			/* proxy */
+			if(events[i].data.ptr->remaining) {
+				proxy = events[i].data.ptr;
+				ret = -1;
+
+				if(proxy->peer->remaining)
+					net_close_proxy(proxy);
+
+				ret = net_exchange(proxy->fd, proxy->peer.fd, proxy-remaining);
+
+				if(ret<=0)
+					net_close_proxy(proxy);
+				continue;
+			}
+
+			ret = http_proxy_make_request(epoll, events[i]->data.ptr);
+			switch(ret) {
+			case -1:
+				perror("http_proxy_make_request");
+			case 1:
+				net_close_proxy(events[i]->data.ptr);
+			}
+
+			/* The server must be watched in another epoll instance */
+			proxy = calloc(1, sizeof(*proxy));
+
+			proxy->fd             = events[i]->peer.fd;
+			proxy->remaining      = events[i]->peer.remaining;
+			proxy->peer.fd        = events[i]->fd;
+			proxy->peer.remaining = events[i]->remaining;
+			net_epoll_interface_add(epollfd, proxy);
 		}
 	}
+   return EXIT_SUCCESS;
+}
+

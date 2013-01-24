@@ -127,7 +127,7 @@ error:
 	return NULL;
 }
 
-struct http_request*
+static struct http_request*
 http_parse_request(char *header)
 {
 	char                *tmp = strdup(header);
@@ -165,7 +165,7 @@ http_parse_request(char *header)
 		goto error;
 	req->protocol = strdup(token);
 
-	req->content_lengh = -1;
+	req->content_lengh = 0;
 	while(token = strtok_r(NULL, HTTP_HEADER_FIELD_SEPARATOR, &saveptr)) {
 		token = strtok_r(token, ": ", &saveptr2);
 		if(strcasecmp(token, "content-length"))
@@ -176,7 +176,7 @@ http_parse_request(char *header)
 			goto error;
 
 		n = utils_parse_number(token);
-		if(!errno || n<0)
+		if(errno || n<0) /* content-length must be positive */
 			goto error;
 
 		req->content_length = n;
@@ -192,41 +192,34 @@ error:
 
 /*
  * returns
- * 	-1 or 0 on error. If -1 is returned errno is set appropriately.
- * 	1 on success.
+ * 	-1 or 1 on error. If -1 is returned errno is set appropriately.
+ * 	0 on success.
  */
 int
-http_proxy_make_request(struct net_proxy *proxy)
+http_proxy_make_request(int epollfd, struct net_proxy *proxy)
 {
 	int    ret;
-	char   *buf;
 	char   *header;
 	char   *ptr;
-	size_t len;
 	struct http_request *req;
 
-	header = http_get_header(proxy->client);
+	header = http_get_header(proxy->fd);
 	if(!header)
 		return -1;
 
 	req = http_parse_request(header);
-	if(!req)
-		return 1; /* errno is not set */
+	if(!req) {
+		free(header);
+		return 1;
+	}
 
 	ret = net_connect(req->host, req->service);
 	if(ret<0)
-		return -1;
+		goto end_func;
 
-	proxy->server = ret;
-
-	/* 2 white spaces + 1 CR + 1 LF */
-	len = strlen(req->method) + strlen(req->path) +strlen(req->protocol)+4;
-	buf = malloc(sizeof(char)*len);
-	snprintf(&buf[0], len, "%s %s %s%s", req->method, req->path,
-	                          req->protocol, HTTP_HEADER_FIELD_SEPARATOR);
-
-	ret = net_send(proxy->server, &buf[0], len);
-	free(buf);
+	proxy->peer.fd = ret;
+	ret = dprintf(proxy->peer.fd, "%s %s %s%s", req->method, req->path, 
+	                           req->protocol, HTTP_HEADER_FIELD_SEPARATOR);
 	if(ret<0)
 		goto end_func;
 
@@ -234,18 +227,18 @@ http_proxy_make_request(struct net_proxy *proxy)
 	if(!ptr)
 		goto end_func;
 
-	ret = net_send(proxy->server, ptr, strlen(ptr));
+	ret = net_send(proxy->peer.fd, ptr, strlen(ptr));
 	if(ret<0)
 		goto end_func;
 
 	proxy->remaining = req->content_length;
-	if(req->content_length!=-1) {
-		ret = net_exchange(proxy->client, proxy->server, proxy->remaining);
-		if(ret<0)
-			error_end_func;
+	if(proxy->remaining) {
+		ret = net_exchange(proxy->fd, proxy->peer.peer.fd, proxy->remaining);
+		if(ret<=0) {
+			net_close_proxy(proxy);
+			goto end_func;
+		}
 		proxy->remaining -= ret;
-		if(!proxy->remaining)
-			proxy->remaining = -1;
 	}
 
 end_func:

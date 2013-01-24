@@ -34,7 +34,7 @@ utils_getopt(int argc, const char **argv)
 	opts = malloc(sizeof(*opts));
 	opts->port  = strdup("8080");
 again:
-	c = getopt(argc, argv, ":hp:b:");
+	c = getopt(argc, argv, ":hdp:b:");
 	switch(c) {
 	case 'p':
 		if(!optarg) {
@@ -45,13 +45,17 @@ again:
 		free(opts->port);
 		opts->port = strdup(optarg);
 		goto again;
+	case 'd':
+		printf("Going to background.\n")
+		daemon(TRUE, TRUE);
+		goto again;
 	case ':':
 		fprintf(stderr, "Option %c requires an operand\n", optopt);
 		exit(EXIT_FAILURE);
 	case -1:
 		break;
 	default: /* ? */
-		fprintf(stderr, "Usage: %s [-p port/service]\n", argv[0]);
+		fprintf(stderr, "Usage: %s [-d] [-p port/service]\n", argv[0]);
 		exit(EXIT_FAILURE);
 	}
 

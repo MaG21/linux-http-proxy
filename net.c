@@ -25,39 +25,46 @@ net_check_errno_EAGAIN(void)
 	return ((errno==EAGAIN) || (errno==EWOULDBLOCK));
 }
 
+int
+net_epoll_interface_add(int epollfd, int sock, void *dataptr)
+{
+	struct epoll_event ev;
+
+	ev.events         = EPOLLET | EPOLLIN;
+	ev.data.ptr       = dataptr;
+
+	return epoll_ctrl(epollfd, EPOLL_CTL_ADD, sock, &ev);
+}
+
 /*
  */
 void
-net_accept_connections(int epollfd, int sock)
+net_accept_connections(int epollfd, int sock_accept)
 {
 	int                sock;
 	int                ret;
-	struct net_proxy   *conn_info;
-	struct epoll_event ev;
+	struct net_proxy   *proxy;
 
 	while(1) {
-		ret = accept(sock, NULL, NULL);
-		if(ret < 0 && net_check_errno_EAGAIN())
+		sock = accept(sock_accept, NULL, NULL);
+		if(sock<0 && net_check_errno_EAGAIN())
 			break;
 
-		if(ret<0)
+		if(sock<0)
 			continue;
 
-		net_set_nonblock(ret);
-		conn_info = malloc(sizeof(*conn_info));
+		net_set_nonblock(sock);
+		proxy = calloc(1, sizeof(*proxy));
 
-		conn_info->client = ret;
-		conn_info->server = NET_SOCKET_CLOSED;
-		ev.events         = EPOLLET | EPOLLIN;
-		ev.data.ptr       = conn_info;
+		proxy->fd = sock;
 
-		ret = epoll_ctrl(epollfd, EPOLL_CTL_ADD, ret, &ev);
+		ret = net_epoll_interface_add(epollfd, sock, proxy);
 		if(!ret)
 			continue;
 
 		if(errno==ENOSPC) { /* epoll can't watch more users */
-			close(conn_info->client);
-			free(conn_info);
+			close(proxy->fd);
+			free(proxy);
 			perror("epoll");
 			return;
 		}
@@ -72,18 +79,18 @@ net_check_sockets(struct epoll_event *evs, size_t n_events)
 	int   i;
 
 	for(i=0; i < n ; i++ ) {
-		if((evs[i].events & EPOLLERR) || (evs[i].events & EPOLLHUP) ||
-		                                 (!(evs[i].events & EPOLLIN)) ) {
-			if(evs[i].data.ptr->dataptr)
-				free(evs[i].data.ptr->dataptr);
+		if((evs[i].->events & EPOLLERR) || (evs[i].->events & EPOLLHUP) ||
+		                                 (!(evs[i].->events & EPOLLIN)) ) {
+			if(evs[i].->data.ptr->dataptr)
+				free(evs[i].->data.ptr->dataptr);
 
-			close(evs[i].data.ptr->client);
+			close(evs[i].->data.ptr->fd);
 
-			if(evs[i].data.ptr->server != NET_SOCKET_CLOSED)
-				close(evs[i].data.ptr->server);
+			if(evs[i].->data.ptr->peer)
+				close(evs[i].->data.ptr->peer.fd);
 
-			free(evs[i].data.ptr);
-			evs[i].data.ptr = NULL;
+			free(evs[i].->data.ptr);
+			evs[i].->data.ptr = NULL;
 		}
 	}
 }
@@ -244,32 +251,44 @@ net_splice(int in, int out, size_t data_len)
 /*
  * returns:
  *	-1 on error, and errno is set appropriately.
- *	on success, 0 if there was no data to exchange or the number of bytes -
- *	transferred.
+ *	0 if the file descriptor referrer by sock_in or sock_out is disconnected.
+ *	on success, returns the number of bytes transferred.
  */
 int
 net_exchange(int sock_in, int sock_out, size_t nbytes)
 {
-	int      ret;
-	int      pipefd[2];
-
-	if(proxy->remaining<0)
-		return 0;
+	int ret;
+	int pipefd[2];
 
 	pipe(pipefd);
 	if(ret<0)
 		net_sys_err("pipe()");
 
 	ret = net_splice(sock_in, NULL, pipefd[0], NULL, nbytes);
-	if(ret<0)
-		return -1;
+	if(ret<=0)
+		return ret;
 
 	ret = net_splice(pipefd[0], NULL, sock_out, NULL, ret);
-	if(ret<0)
-		return -1;
+	if(ret<=0)
+		return ret;
 
 	close(pipefd[0]);
 	close(pipefd[1]);
    return ret;
+}
+
+void
+net_close_proxy(struct net_proxy *proxy)
+{
+	if(!proxy)
+		return;
+
+	/* protect standard file descriptors */
+	if(proxy->fd > 2)
+		close(proxy->fd);
+	if(proxy->peer.fd > 2 )
+		close(proxy->peer.fd);
+	free(proxy);
+    return;
 }
 
