@@ -243,13 +243,18 @@ net_splice(int in, int out, size_t data_len)
 
 /*
  * returns:
- *
+ *	-1 on error, and errno is set appropriately.
+ *	on success, 0 if there was no data to exchange or the number of bytes -
+ *	transferred.
  */
 int
-net_exchange(int sock_in, int sock_out, size_t nbytes)
+net_exchange(const struct net_proxy *proxy)
 {
 	int      ret;
 	int      pipefd[2];
+
+	if(proxy->remaining<0)
+		return 0;
 
 	pipe(pipefd);
 	if(ret<0)

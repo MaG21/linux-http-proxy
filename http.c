@@ -43,9 +43,31 @@ http_get_header(int sock)
    return header;
 }
 
+static struct http_url
+http_parse_resource(char *resouce)
+{
+	char            *token;
+	char            *saveptr;
+	struct http_url *res;
+
+	token = strtok_r(resource, ":", &saveptr);
+	if(!token)
+		return NULL;
+
+	res       = calloc(1, sizeof(*res));
+	res->host = strdup(token);
+
+	token = strtok_r(NULL, "\0")
+	if(!token)
+		res->service = strdup(token);
+	else
+		res->service = strdup("80"); /* by default 80 */
+   return res;
+}
+
 /*
  * returns:
- * 	NULL if an error occurs.
+ *      NULL if the url could not be parsed.
  * 	NON-NULL.
  *
  * NOTE:
@@ -68,22 +90,21 @@ http_parse_url(char *url)
 		return NULL;
 	}
 
-	URL = malloc(sizeof(*URL));
-	URL->scheme = strdup(token);
+	URL           = malloc(sizeof(*URL));
+	URL->scheme   = strdup(token);
 	URL->issecure = !strcasecmp(token, "https") ? TRUE : FALSE;
 
 	token = strtok_r(NULL, "/", &saveptr);
 	if(!token)
 		goto error;
 
-	res = net_parse_resource(token);
+	res = http_parse_resource(token);
 	if(!res)
 		goto error;
 
-	URL->host = res->host
-	URL->port = res->port
-	URL->issecure = FALSE;
-	if(res->port && !strcmp(token, "443"))
+	URL->host    = res->host
+	URL->service = res->service
+	if(res->service && !strcmp(token, "443"))
 		URL->issecure = TRUE;
 	free(res); /* yes, just the structure */
 
@@ -104,28 +125,6 @@ error:
 	free(tmp_ptr);
 	free_http_url(URL);
 	return NULL;
-}
-
-static struct http_url
-http_parse_resource(char *resouce)
-{
-	char            *token;
-	char            *saveptr;
-	struct http_url *res;
-
-	token = strtok_r(resource, ":", &saveptr);
-	if(!token)
-		return NULL;
-
-	res       = calloc(1, sizeof(*res));
-	res->host = strdup(token);
-
-	token = strtok_r(NULL, "\0")
-	if(!token)
-		res->port = strdup(token);
-	else
-		res->port = strdup("80"); /* by default 80 */
-   return res;
 }
 
 struct http_request*
@@ -193,18 +192,20 @@ error:
 
 /*
  * returns
- * 	-1 or 1 on error. If -1 is returned errno is set appropriately.
+ * 	-1 or 0 on error. If -1 is returned errno is set appropriately.
  * 	1 on success.
  */
 int
-http_proxy_make_request(int sock)
+http_proxy_make_request(struct net_proxy *proxy)
 {
 	int    ret;
 	char   *buf;
 	char   *header;
+	char   *ptr;
 	size_t len;
+	struct http_request *req;
 
-	header = http_get_header(sock);
+	header = http_get_header(proxy->client);
 	if(!header)
 		return -1;
 
@@ -212,28 +213,43 @@ http_proxy_make_request(int sock)
 	if(!req)
 		return 1; /* errno is not set */
 
+	ret = net_connect(req->host, req->service);
+	if(ret<0)
+		return -1;
+
+	proxy->server = ret;
+
 	/* 2 white spaces + 1 CR + 1 LF */
 	len = strlen(req->method) + strlen(req->path) +strlen(req->protocol)+4;
 	buf = malloc(sizeof(char)*len);
 	snprintf(&buf[0], len, "%s %s %s%s", req->method, req->path,
 	                          req->protocol, HTTP_HEADER_FIELD_SEPARATOR);
 
-	ret = net_send(server, &buf[0], len);
+	ret = net_send(proxy->server, &buf[0], len);
 	free(buf);
 	if(ret<0)
-		goto error_end_func;
+		goto end_func;
 
-	ret = net_send(server, header, strlen(header));
+	ptr = strstr(header, HTTP_HEADER_FIELD_SEPARATOR);
+	if(!ptr)
+		goto end_func;
+
+	ret = net_send(proxy->server, ptr, strlen(ptr));
 	if(ret<0)
-		goto error_end_func;
+		goto end_func;
 
+	proxy->remaining = req->content_length;
 	if(req->content_length!=-1) {
-		ret = net_exchange(server, client, req->content_length);
+		ret = net_exchange(proxy->client, proxy->server, proxy->remaining);
 		if(ret<0)
 			error_end_func;
+		proxy->remaining -= ret;
+		if(!proxy->remaining)
+			proxy->remaining = -1;
 	}
 
-error_end_func:
+end_func:
+	free(header);
 	http_free_request(req);
 	return ret;
 }
@@ -258,9 +274,9 @@ http_free_request(struct http_request *req)
 		free(req->url->host);
 	if(req->url->path)
 		free(req->url->path);
-	if(req->url->port)
-		free(req->url->port);
-
+	if(req->url->service)
+		free(req->url->service);
+	free(req->url);
 end_func:
 	free(req);
 	return;

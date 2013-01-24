@@ -20,7 +20,7 @@ struct http_url {
 	char      *scheme;   /* either HTTP or HTTPS */
 	char      *host;
 	char      *path;
-	char      *port;
+	char      *service;
 	uint8_t   issecure;  /* TRUE or FALSE */
 };
 
