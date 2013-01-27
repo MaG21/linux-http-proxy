@@ -1,6 +1,10 @@
 /*
  * FIXME: Identation levels too deep.
  */
+#include <sys/epoll.h>
+#include <stdlib.h>
+#include <stdio.h>
+
 #include "http.h"
 #include "net.h"
 #include "utils.h"
@@ -11,7 +15,7 @@ int
 main(int argc, char **argv)
 {
 	int                  i;
-	int                  n
+	int                  n;
 	int                  ret;
 	int                  sock;
 	int                  epollfd;
@@ -66,7 +70,7 @@ main(int argc, char **argv)
 				continue;
 			}
 
-			ret = http_proxy_make_request(epoll, events[i]->data.ptr);
+			ret = http_proxy_make_request(epollfd, events[i]->data.ptr);
 			switch(ret) {
 			case -1:
 				perror("http_proxy_make_request");

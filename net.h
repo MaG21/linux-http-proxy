@@ -4,13 +4,6 @@
 /* This program handles non-blocking sockets, please, keep that in mind
  * while reading the source code.
  */
-#include <netdb.h>
-#include <sys/socket.h>
-#include <sys/types.h>
-#include <netinet/in.h>
-#include <unistd.h>
-#include <errno.h>
-
 #define NET_SOCKET_CLOSED -1
 
 struct net_proxy {
@@ -22,5 +15,7 @@ struct net_proxy {
 	size_t remaining;
 	int    fd;
 };
+
+/* prototipes */
 
 #endif

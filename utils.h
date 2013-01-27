@@ -1,13 +1,6 @@
 #ifndef _UTILS_H
 #define _UTILS_H
 
-#include <unistd.h>
-#include <string.h>
-#include <stdlib.h>
-#include <errno.h>
-#include <getopt.h>
-#include <limits.h>
-
 #ifndef TRUE
 #define TRUE  0x01
 #else
@@ -24,6 +17,14 @@
 
 struct utils_options {
 	char  *port;
-}
+};
+
+/* prototipes */
+
+long int  utils_parse_number(const char *);
+
+struct util_options*  utils_getopt(int, char* const *);
+
+void  utils_free_options(struct utils_options *);
 
 #endif

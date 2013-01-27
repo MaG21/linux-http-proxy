@@ -1,3 +1,16 @@
+#define _GNU_SOURCE
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+#include <netdb.h>
+#include <sys/socket.h>
+#include <sys/types.h>
+#include <netinet/in.h>
+#include <unistd.h>
+#include <errno.h>
+#include <sys/epoll.h>
+#include <fcntl.h>
+
 #include "net.h"
 
 /*
@@ -23,6 +36,22 @@ static _Bool
 net_check_errno_EAGAIN(void)
 {
 	return ((errno==EAGAIN) || (errno==EWOULDBLOCK));
+}
+
+void
+net_set_nonblock(int sock)
+{
+	int flags;
+	int ret;
+
+	ret = fcntl(sock, F_GETFL, 0);
+	if(ret<0)
+		net_sys_err("fcntl");
+
+	ret = fcntl(sock, F_SETFL, O_NONBLOCK|ret);
+	if(ret<0)
+		net_sys_err("fcntl");
+    return;
 }
 
 int
@@ -74,23 +103,23 @@ net_accept_connections(int epollfd, int sock_accept)
 }
 
 void
-net_check_sockets(struct epoll_event *evs, size_t n_events)
+net_check_sockets(struct epoll_event **evs, size_t n_events)
 {
 	int   i;
 
-	for(i=0; i < n ; i++ ) {
-		if((evs[i].->events & EPOLLERR) || (evs[i].->events & EPOLLHUP) ||
-		                                 (!(evs[i].->events & EPOLLIN)) ) {
-			if(evs[i].->data.ptr->dataptr)
-				free(evs[i].->data.ptr->dataptr);
+	for(i=0; i < n_events ; i++ ) {
+		if((evs[i]->events & EPOLLERR) || (evs[i]->events & EPOLLHUP) ||
+		                                 (!(evs[i]->events & EPOLLIN)) ) {
+			if(evs[i]->data.ptr->dataptr)
+				free(evs[i]->data.ptr->dataptr);
 
-			close(evs[i].->data.ptr->fd);
+			close(evs[i]->data.ptr->fd);
 
-			if(evs[i].->data.ptr->peer)
-				close(evs[i].->data.ptr->peer.fd);
+			if(evs[i]->data.ptr->peer)
+				close(evs[i]->data.ptr->peer.fd);
 
-			free(evs[i].->data.ptr);
-			evs[i].->data.ptr = NULL;
+			free(evs[i]->data.ptr);
+			evs[i]->data.ptr = NULL;
 		}
 	}
 }
@@ -131,7 +160,7 @@ net_listen(char *service)
 		if(!ret)
 			break;
 
-		if(ret<0 && errno = EPERM)
+		if(ret<0 && errno==EPERM)
 			net_sys_err("bind");
 
 		close(sock);
@@ -142,7 +171,7 @@ net_listen(char *service)
 		exit(EXIT_FAILURE);
 	}
 
-	freeaddrinf(result)
+	freeaddrinf(result);
 
 	/* 128, check the Linux man page for the listen() system call */
 	ret = listen(sock, 128);
@@ -181,29 +210,13 @@ net_connect(const char *host, const char *service)
 		if(ret<0)
 			return -1;
 
-		sock = connect(ret, rp->ai_addr, rp->ai_addrlen)
+		sock = connect(ret, rp->ai_addr, rp->ai_addrlen);
 		if(sock!=-1)
 			break;
 	}
 
 	freeaddrinfo(result);
    return sock;
-}
-
-void
-net_set_nonblock(int sock)
-{
-	int flags;
-	int ret;
-
-	ret = fcntl(sock, F_GETFL, 0);
-	if(ret<0)
-		net_sys_err("fcntl");
-
-	ret = fcntl(sock, F_SETFL, O_NONBLOCK|ret);
-	if(ret<0)
-		net_sys_err("fcntl");
-    return;
 }
 
 ssize_t
@@ -264,11 +277,11 @@ net_exchange(int sock_in, int sock_out, size_t nbytes)
 	if(ret<0)
 		net_sys_err("pipe()");
 
-	ret = net_splice(sock_in, NULL, pipefd[0], NULL, nbytes);
+	ret = net_splice(sock_in, pipefd[1], nbytes);
 	if(ret<=0)
 		return ret;
 
-	ret = net_splice(pipefd[0], NULL, sock_out, NULL, ret);
+	ret = net_splice(pipefd[0], sock_out, ret);
 	if(ret<=0)
 		return ret;
 

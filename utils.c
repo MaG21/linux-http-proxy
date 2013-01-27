@@ -1,3 +1,12 @@
+#include <unistd.h>
+#include <string.h>
+#include <stdio.h>
+#include <stdlib.h>
+#include <errno.h>
+#include <getopt.h>
+#include <limits.h>
+#include <stdint.h>
+
 #include "utils.h"
 
 /*
@@ -15,22 +24,24 @@ utils_parse_number(const char *s)
 	long int   n;	
 
 	errno = 0;
-	n = strtol(token, (char**)0, 0x0A);
-	if((errno == ERANGE && (n==LONG_MAX || val==LONG_MIN))
-	                              || (errno != 0 && val == 0))
+	n = strtol(s, (char**)0, 0x0A);
+	if((errno == ERANGE && (n==LONG_MAX || n==LONG_MIN))
+	                              || (errno != 0 && n== 0))
 		return -1;
 	return n;
 }
 
 struct util_options*
-utils_getopt(int argc, const char **argv)
+utils_getopt(int argc, char* const argv[])
 {
 	char                 c;
-	extern int           opterr  = 0;
+	uint8_t              background  = FALSE;
+	extern int           opterr;
 	extern int           optopt;
 	extern char          *optarg;
 	struct util_options  *opts;
 
+	opterr = 0;
 	opts = malloc(sizeof(*opts));
 	opts->port  = strdup("8080");
 again:
@@ -46,8 +57,7 @@ again:
 		opts->port = strdup(optarg);
 		goto again;
 	case 'd':
-		printf("Going to background.\n")
-		daemon(TRUE, TRUE);
+		background = TRUE;
 		goto again;
 	case ':':
 		fprintf(stderr, "Option %c requires an operand\n", optopt);
@@ -59,6 +69,11 @@ again:
 		exit(EXIT_FAILURE);
 	}
 
+	if(background) {
+		printf("Going to background...");
+		daemon(TRUE, FALSE);
+		printf("\tOk\n");
+	}
 	return opts;
 }
 
@@ -70,43 +85,5 @@ utils_free_options(struct utils_options *opts)
 	if(opts->port)
 		free(opts->port);
 	free(opts);
-}
-
-void
-strip(char *string)
-{
-	char    *ptr = string;
-	size_t  len  = strlen(string);
-
-	while(*ptr) {
-		if(isspace(*ptr))
-			ptr++;
-	}
-
-	if(!*ptr) {
-		memset(string, 0, len);
-		return;
-	} else if(ptr - string) {
-		memmove(string, string[ptr-string], len - (ptr-string));
-	}
-
-	ptr = string + len - 1;
-	if(!isspace(*ptr))
-		return;
-
-	while(isspace(*ptr))
-		*ptr--;
-	*(++ptr) = '\0';
-   return;
-}
-
-void
-strlower(char *string)
-{
-	char *ptr = string;
-
-	while(*ptr)
-		*ptr++ = tolower(*ptr);
-  return;
 }
 

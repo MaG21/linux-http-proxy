@@ -12,9 +12,9 @@ A fast, lightweight http/https proxy server for GNU/Linux.
 	2. Debugging capabilities.
 	3. Completeness. (Basic features only)
 
-The main goal is to leave aside portability issues and provide a small, clean
-yet fast HTTP/HTTPS proxy server that makes the most out of your GNU/Linux box.
-Also, IPv6 will be suppported.
+The main goal is to leave aside portability issues and provide a small, fast,
+secure and clean HTTP/HTTPS proxy server that makes the most out of your
+GNU/Linux box. Also, IPv6 will be suppported.
 
 ## NOTE
 This server is not done yet, I'll be working on it till I finish completly
