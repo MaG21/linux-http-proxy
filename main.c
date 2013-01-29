@@ -1,5 +1,5 @@
 /*
- * FIXME: Identation levels too deep.
+ * FIXME: Identation level
  */
 #include <sys/epoll.h>
 #include <stdlib.h>
@@ -20,10 +20,14 @@ main(int argc, char **argv)
 	int                  sock;
 	int                  epollfd;
 	struct net_proxy     *proxy;
+	struct net_proxy     *newproxy;
 	struct epoll_event   *events;
 	struct utils_options *opts;
 
 	opts = utils_getopt(argc, argv);
+
+	printf("Init server on port %s ...", opts->port);
+	fflush(stdout);
 
 	sock = net_listen(opts->port);
 	utils_free_options(opts);
@@ -34,6 +38,12 @@ main(int argc, char **argv)
 		perror("epoll");
 		exit(EXIT_FAILURE);
 	}
+
+	proxy = malloc(sizeof(*proxy));
+	proxy->fd = sock;
+	net_epoll_interface_add(epollfd, proxy);
+
+	puts("Ok");
 
 	events = calloc(MAX_EVENTS, sizeof(*events));
 
@@ -50,41 +60,41 @@ main(int argc, char **argv)
 			if(!events[i].data.ptr)
 				continue;
 
-			if(events[i].data.ptr->client==sock) {
+			proxy = events[i].data.ptr;
+
+			if(proxy->fd==sock) {
 				net_accept_connections(epollfd, sock);
 				continue;
 			}
 
 			/* proxy */
-			if(events[i].data.ptr->remaining) {
-				proxy = events[i].data.ptr;
-				ret = -1;
-
-				if(proxy->peer->remaining)
+			if(proxy->remaining) {
+				if(proxy->peer.remaining)
 					net_close_proxy(proxy);
 
-				ret = net_exchange(proxy->fd, proxy->peer.fd, proxy-remaining);
+				ret = net_exchange(proxy->fd, proxy->peer.fd, proxy->remaining);
 
 				if(ret<=0)
 					net_close_proxy(proxy);
 				continue;
 			}
 
-			ret = http_proxy_make_request(epollfd, events[i]->data.ptr);
+			ret = http_proxy_make_request(epollfd, proxy);
 			switch(ret) {
 			case -1:
 				perror("http_proxy_make_request");
 			case 1:
-				net_close_proxy(events[i]->data.ptr);
+				net_close_proxy(proxy);
+				continue;
 			}
 
 			/* The server must be watched in another epoll instance */
-			proxy = calloc(1, sizeof(*proxy));
+			newproxy = calloc(1, sizeof(*proxy));
 
-			proxy->fd             = events[i]->peer.fd;
-			proxy->remaining      = events[i]->peer.remaining;
-			proxy->peer.fd        = events[i]->fd;
-			proxy->peer.remaining = events[i]->remaining;
+			newproxy->fd             = proxy->peer.fd;
+			newproxy->remaining      = proxy->peer.remaining;
+			newproxy->peer.fd        = proxy->fd;
+			newproxy->peer.remaining = proxy->remaining;
 			net_epoll_interface_add(epollfd, proxy);
 		}
 	}

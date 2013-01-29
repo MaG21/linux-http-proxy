@@ -23,7 +23,7 @@ struct utils_options {
 
 long int  utils_parse_number(const char *);
 
-struct util_options*  utils_getopt(int, char* const *);
+struct utils_options*  utils_getopt(int, char* const *);
 
 void  utils_free_options(struct utils_options *);
 

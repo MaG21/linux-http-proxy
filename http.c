@@ -62,7 +62,7 @@ http_get_header(int sock)
 	char   buf[MAX_BUF+1];
 	size_t len;
 
-	ret = recv(sock, &buf[0], MAX_BUF, MSG_PEEK);
+	ret = net_recv(sock, &buf[0], MAX_BUF, MSG_PEEK);
 	if(ret<0)
 		return NULL;
 
@@ -75,13 +75,12 @@ http_get_header(int sock)
 
 	len = ptr - buf;
 	header = malloc(sizeof(char)*(len+1));
-	memcpy(&header[0], &buf[0], len);
-	header[len]='\0';
 
-	ret = recv(sock, &buf[0], len + 4, 0); /* consume. 4 = \r\n\r\n */
+	ret = net_recv(sock, &header[0], len, 0);
 	if(ret<0)
 		return NULL;
 
+	header[ret]='\0';
    return header;
 }
  
@@ -109,7 +108,7 @@ http_parse_resource(char *resource)
 	res->host = strdup(token);
 
 	token = strtok_r(NULL, "\0", &saveptr);
-	if(!token)
+	if(token)
 		res->service = strdup(token);
 	else
 		res->service = strdup("80"); /* by default 80 */
@@ -160,14 +159,15 @@ http_parse_url(char *url)
 	free(res); /* yes, just the structure */
 
 	token = strtok_r(NULL, "\0", &saveptr);
-	if(!token)
-		goto error;
-
-	tmp = strlen(token);
-	URL->path = malloc(sizeof(char)*(tmp+2));
-	URL->path[0] = '/';
-	memcpy(&URL->path[1], token, tmp);
-	URL->path[tmp] = '\0';
+	if(!token) {
+		URL->path = strdup("/");
+	} else {
+		tmp = strlen(token);
+		URL->path = malloc(sizeof(char)*(tmp+2));
+		URL->path[0] = '/';
+		memcpy(&URL->path[1], token, tmp);
+		URL->path[tmp] = '\0';
+	}
 
 	free(tmp_ptr);
 	return URL;
@@ -183,6 +183,7 @@ http_parse_request(char *header)
 {
 	char                *tmp      = strdup(header);
 	char                *token;
+	char                *ptr;
 	char                *saveptr;
 	char                *saveptr2;
 	long int            n;
@@ -195,18 +196,20 @@ http_parse_request(char *header)
 		return NULL;
 	}
 
-	req = malloc(sizeof(*req));
-	if(!strcasecmp(req->method, "CONNECT")) {
-		req->method = strdup("GET");
-		req->url    = http_parse_resource(token);
-	} else {
-		req->method = strdup(token);
-		req->url    = http_parse_url(token);
-	}
+	ptr = token;
 
 	token = strtok_r(NULL, " ", &saveptr2);
 	if(!token)
 		goto error;
+
+	req = malloc(sizeof(*req));
+	if(!strcasecmp(ptr,  "CONNECT")) {
+		req->method = strdup("GET");
+		req->url    = http_parse_resource(token);
+	} else {
+		req->method = strdup(ptr);
+		req->url    = http_parse_url(token);
+	}
 
 	if(!req->url)
 		goto error;

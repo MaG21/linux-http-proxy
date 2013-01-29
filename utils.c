@@ -31,7 +31,7 @@ utils_parse_number(const char *s)
 	return n;
 }
 
-struct util_options*
+struct utils_options*
 utils_getopt(int argc, char* const argv[])
 {
 	char                 c;
@@ -39,7 +39,7 @@ utils_getopt(int argc, char* const argv[])
 	extern int           opterr;
 	extern int           optopt;
 	extern char          *optarg;
-	struct util_options  *opts;
+	struct utils_options *opts;
 
 	opterr = 0;
 	opts = malloc(sizeof(*opts));

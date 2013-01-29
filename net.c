@@ -41,7 +41,6 @@ net_check_errno_EAGAIN(void)
 void
 net_set_nonblock(int sock)
 {
-	int flags;
 	int ret;
 
 	ret = fcntl(sock, F_GETFL, 0);
@@ -55,14 +54,14 @@ net_set_nonblock(int sock)
 }
 
 int
-net_epoll_interface_add(int epollfd, int sock, void *dataptr)
+net_epoll_interface_add(int epollfd, struct net_proxy *proxy)
 {
 	struct epoll_event ev;
 
 	ev.events         = EPOLLET | EPOLLIN;
-	ev.data.ptr       = dataptr;
+	ev.data.ptr       = proxy;
 
-	return epoll_ctrl(epollfd, EPOLL_CTL_ADD, sock, &ev);
+	return epoll_ctl(epollfd, EPOLL_CTL_ADD, proxy->fd, &ev);
 }
 
 /*
@@ -87,7 +86,7 @@ net_accept_connections(int epollfd, int sock_accept)
 
 		proxy->fd = sock;
 
-		ret = net_epoll_interface_add(epollfd, sock, proxy);
+		ret = net_epoll_interface_add(epollfd, proxy);
 		if(!ret)
 			continue;
 
@@ -103,23 +102,23 @@ net_accept_connections(int epollfd, int sock_accept)
 }
 
 void
-net_check_sockets(struct epoll_event **evs, size_t n_events)
+net_check_sockets(struct epoll_event *evs, size_t n_events)
 {
 	int   i;
+	struct net_proxy *proxy;
 
 	for(i=0; i < n_events ; i++ ) {
-		if((evs[i]->events & EPOLLERR) || (evs[i]->events & EPOLLHUP) ||
-		                                 (!(evs[i]->events & EPOLLIN)) ) {
-			if(evs[i]->data.ptr->dataptr)
-				free(evs[i]->data.ptr->dataptr);
+		if((evs[i].events & EPOLLERR) || (evs[i].events & EPOLLHUP) ||
+		                                 (!(evs[i].events & EPOLLIN)) ) {
+			proxy = evs[i].data.ptr;
+			if(!proxy)
+				continue; 
 
-			close(evs[i]->data.ptr->fd);
+			close(proxy->fd);
+			close(proxy->peer.fd);
 
-			if(evs[i]->data.ptr->peer)
-				close(evs[i]->data.ptr->peer.fd);
-
-			free(evs[i]->data.ptr);
-			evs[i]->data.ptr = NULL;
+			free(proxy);
+			evs[i].data.ptr = NULL;
 		}
 	}
 }
@@ -136,7 +135,7 @@ net_listen(char *service)
 	int              sock;
 	int              ret;
 	struct addrinfo  *rp;
-	struct addrinfo  *result;
+	struct addrinfo  *result  =NULL;
 	struct addrinfo  hints;
 
 	memset(&hints, 0, sizeof(hints));
@@ -145,7 +144,7 @@ net_listen(char *service)
 	hints.ai_flags    = AI_PASSIVE;
 	hints.ai_protocol = 0;
 
-	ret = getaddrinfo(NULL, service, &hints, &rp);
+	ret = getaddrinfo(NULL, service, &hints, &result);
 	if(ret) {
 		fprintf(stderr, "getaddrinfo: %s\n", gai_strerror(ret));
 		exit(EXIT_FAILURE);
@@ -171,7 +170,7 @@ net_listen(char *service)
 		exit(EXIT_FAILURE);
 	}
 
-	freeaddrinf(result);
+	freeaddrinfo(result);
 
 	/* 128, check the Linux man page for the listen() system call */
 	ret = listen(sock, 128);
@@ -205,13 +204,13 @@ net_connect(const char *host, const char *service)
 	if(ret<0)
 		return -1;
 
-	for(rp = result; rp; rp = rp = rp->ai_next) {
-		ret = socket(rp->ai_family, rp->ai_socktype, rp->ai_protocol);
-		if(ret<0)
+	for(rp = result; rp; rp =  rp->ai_next) {
+		sock = socket(rp->ai_family, rp->ai_socktype, rp->ai_protocol);
+		if(sock<0)
 			return -1;
 
-		sock = connect(ret, rp->ai_addr, rp->ai_addrlen);
-		if(sock!=-1)
+		ret = connect(sock, rp->ai_addr, rp->ai_addrlen);
+		if(!ret)
 			break;
 	}
 
@@ -235,6 +234,31 @@ net_send(int sock, const char *buf, size_t nbytes)
 		nbytes -= n;
 	} while(nbytes);
    return ret;
+}
+
+ssize_t
+net_recv(int sock, char *buf, size_t nbytes, int flags)
+{
+	size_t  n    = 0;
+	size_t  idx  = 0;
+	ssize_t ret;
+
+	do {
+		ret = recv(sock, &buf[idx], nbytes, flags);
+		if(!ret)
+			return 0; /* connection closed */
+
+		if(ret<0 && net_check_errno_EAGAIN())
+			return n;
+
+		if(ret<0)
+			return -1;
+
+		n += ret;
+		idx += ret;
+		nbytes -= ret;
+	} while(nbytes);
+   return n;
 }
 
 static int
@@ -273,7 +297,7 @@ net_exchange(int sock_in, int sock_out, size_t nbytes)
 	int ret;
 	int pipefd[2];
 
-	pipe(pipefd);
+	ret = pipe(pipefd);
 	if(ret<0)
 		net_sys_err("pipe()");
 

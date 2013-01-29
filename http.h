@@ -3,12 +3,11 @@
 
 #include "net.h"
 
-#define CR                 "\r"
-#define LF                 "\n"
-#define HTTP_HEADER_FIELD_SEPARATOR    "\r\n"
 #define HTTP_HEADER_END_OF_HEADER      "\r\n\r\n"
+#define HTTP_HEADER_FIELD_SEPARATOR    "\r\n"
 
-#define HTTP_SCHEME_LENGTH             0x06
+#define HTTP_PROXY_ERROR
+#define HTTP_PROXY_CLOSE_CONNECTION
 
 struct http_url {
 	char      *scheme;   /* either HTTP or HTTPS */
@@ -19,10 +18,10 @@ struct http_url {
 };
 
 struct http_request {
-	struct http_url  *url;
-	char             *method;
-	char             *protocol;
-	ssize_t          content_length;
+	struct http_url *url;
+	char            *method;
+	char            *protocol;
+	size_t          content_length;
 };
 
 /* prototipes */
