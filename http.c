@@ -10,7 +10,6 @@
 #include "net.h"
 #include "http.h"
 
-#define MAX_BUF          4096   /* 4kb! o_o */
 
 static void
 http_free_url(struct http_url *url)
@@ -44,6 +43,8 @@ http_free_request(struct http_request *req)
 	return;
 }
 
+#define MAX_BUF          4096   /* 4kb! o_o */
+
 /*
  * returns:
  *      NULL on error and errno is set appropriately.
@@ -56,31 +57,49 @@ http_free_request(struct http_request *req)
 static char*
 http_get_header(int sock)
 {
+	int    i;
 	int    ret;
-	char   *ptr;
 	char   *header;
 	char   buf[MAX_BUF+1];
 	size_t len;
 
-	ret = net_recv(sock, &buf[0], MAX_BUF, MSG_PEEK);
-	if(ret<0)
-		return NULL;
+	/* first read as much as possible */
+	ret = net_recv(sock, &buf[0], MAX_BUF, 0);
 
-	buf[ret]='\0';
-	ptr = strstr(&buf[0], HTTP_HEADER_END_OF_HEADER);
-	if(!ptr) {
-		errno = ECONNABORTED;
+	if(ret<=0) {
+		if(!ret)
+			errno = ECONNRESET;
 		return NULL;
 	}
 
-	len = ptr - buf;
+	len = ret;
+	if(strncmp(&buf[len-4], "\r\n\r\n", 4)) {
+		for(i=len; i < MAX_BUF - ret; i++) {
+			ret = net_recv(sock, &buf[i], 1, 0);
+
+			if(ret<=0) {
+				if(!ret)
+					errno = ECONNRESET;
+				return NULL;
+			}
+
+			len += ret;
+			if(!strncmp(&buf[len-4], "\r\n\r\n", 4))
+				goto header_successfully_parsed;
+		}
+
+		errno = ECONNABORTED;
+		return NULL;
+	} else {
+		buf[ret]='\0';
+	}
+
+header_successfully_parsed:
+
 	header = malloc(sizeof(char)*(len+1));
 
-	ret = net_recv(sock, &header[0], len, 0);
-	if(ret<0)
-		return NULL;
-
-	header[ret]='\0';
+	memcpy(&header[0], &buf[0], len);
+	header[len]='\0';
    return header;
 }
  
