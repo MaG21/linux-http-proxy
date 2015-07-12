@@ -14,7 +14,7 @@ net.o: ../include/net.h
 utils.o: ../include/utils.h
 	$(CC) $(CFLAGS) $(INCLUDE) -c -o utils.o utils.c
 
-main.o: http.o net.o utils.o main.o
+main.o: http.o net.o utils.o
 	$(CC) $(CFLAGS) $(INCLUDE) -c -o main.o main.c
 
 clean:
