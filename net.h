@@ -27,6 +27,7 @@ void    net_check_sockets(struct epoll_event *, size_t);
 int     net_listen(char *);
 int     net_connect(const char *, const char *);
 ssize_t net_send(int, const char *, size_t);
+ssize_t net_recv(int, char *, size_t, int);
 int     net_exchange(int, int, size_t);
 void    net_close_proxy(struct net_proxy *);
 
