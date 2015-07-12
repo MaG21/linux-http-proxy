@@ -18,8 +18,7 @@ GNU/Linux box. Also, IPv6 will be suppported.
 
 ## NOTE
 This repository uses git submodules to handle dependencies internally, if one
-were to clone this repository over HTTPS, he or she would have to do something similar to
-the following:
+were to clone this repository over HTTPS, he or she would have to do as follows
 
 	$ git clone https://github.com/MaG21/linux-http-proxy.git
 	$ cd lib/http-parser
