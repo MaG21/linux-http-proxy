@@ -17,6 +17,11 @@ secure and clean HTTP/HTTPS proxy server that makes the most out of your
 GNU/Linux box. Also, IPv6 will be suppported.
 
 ## NOTE
+This repository uses git submodules to handle dependencies internally, in order
+to clone this repository properly, if one were to clone this repository using
+HTTPS, will have to do something similar to the following command:
+	``git clone --recursive https://github.com/MaG21/linux-http-proxy.git``
+
 This server is not done yet, I'll be working on it till I finish completly
 the server.
 
