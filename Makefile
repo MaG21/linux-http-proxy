@@ -1,9 +1,6 @@
 # by: MaG.
-#lhps stand for Linux Http Proxy Server.
 
-NAME=lhps
-CC=gcc
-CFLAGS=-ggdb -Wall
+include Makefile.inc
 
 all: linux-http-proxy
 
