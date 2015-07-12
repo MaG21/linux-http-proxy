@@ -160,7 +160,7 @@ http_parse_url(char *url)
 
 	URL           = malloc(sizeof(*URL));
 	URL->scheme   = strdup(token);
-	URL->issecure = !strcasecmp(token, "https")
+	URL->issecure = !strcasecmp(token, "https");
 
 	token = strtok_r(NULL, "/", &saveptr);
 	if(!token)
