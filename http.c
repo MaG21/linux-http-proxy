@@ -3,7 +3,6 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include <limits.h>
 #include <errno.h>
 
 #include "utils.h"
@@ -142,7 +141,7 @@ http_parse_url(char *url)
 
 	URL           = malloc(sizeof(*URL));
 	URL->scheme   = strdup(token);
-	URL->issecure = !strcasecmp(token, "https") ? TRUE : FALSE;
+	URL->issecure = !strcasecmp(token, "https")
 
 	token = strtok_r(NULL, "/", &saveptr);
 	if(!token)
@@ -221,15 +220,15 @@ http_parse_request(char *header)
 
 	req->content_length = 0;
 	while((token=strtok_r(NULL, HTTP_HEADER_FIELD_SEPARATOR, &saveptr))) {
-		token = strtok_r(token, ": ", &saveptr2);
-		if(strcasecmp(token, "content-length"))
+		ptr = strtok_r(token, ": ", &saveptr2);
+		if(strcasecmp(ptr, "content-length"))
 			continue;
 
-		token = strtok_r(NULL, "\0", &saveptr2);
-		if(!token)
+		ptr = strtok_r(NULL, "\0", &saveptr2);
+		if(!ptr)
 			goto error;
 
-		n = utils_parse_number(token);
+		n = utils_parse_number(ptr);
 		if(errno || n<0) /* content-length must be positive */
 			goto error;
 
