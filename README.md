@@ -21,7 +21,15 @@ This repository uses git submodules to handle dependencies internally, if one
 were to clone this repository over HTTPS, she would have to do something similar to
 the following:
 
-	git clone --recursive https://github.com/MaG21/linux-http-proxy.git
+	$ git clone https://github.com/MaG21/linux-http-proxy.git
+	$ cd lib/http-parser
+	$ git submodule init
+	$ git submodule update
+
+or
+
+	$ git clone --recursive https://github.com/MaG21/linux-http-proxy.git
+
 
 This server is not done yet, I'll be working on it till I finish completly
 the server.
