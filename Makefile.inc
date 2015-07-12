@@ -3,7 +3,7 @@
 #lhps stand for Linux Http Proxy Server.
 NAME    = lhps
 CC      = gcc
-CFLAGS  =-ggdb -Wall
+CFLAGS  = -ggdb -Wall
 LD	= gcc
 LDFLAGS	= 
 RM	= rm
