@@ -3,7 +3,7 @@
 
 NAME=lhps
 CC=gcc
-CFLAGS=-ggdb
+CFLAGS=-ggdb -Wall
 
 all: linux-http-proxy
 
