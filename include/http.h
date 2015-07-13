@@ -19,12 +19,16 @@ struct http_url {
 
 struct http_request {
 	struct http_url *url;
-	char            *method;
-	char            *protocol;
-	size_t          content_length;
+
+	char   *method;
+	char   *protocol;
+	size_t content_length;
+
+	char   *remaining;
+	size_t remaining_length;
 };
 
-/* prototipes */
+/* prototypes */
 
 int http_proxy_make_request(int , struct net_proxy *);
 
