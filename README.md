@@ -22,7 +22,7 @@ were to clone this repository over HTTPS, he or she would have to do as
 follows:
 
 	$ git clone https://github.com/MaG21/linux-http-proxy.git
-	$ cd lib/http-parser
+	$ cd lib/picohttpparser
 	$ git submodule init
 	$ git submodule update
 
